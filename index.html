@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UC Autocue v1.0</title>
+    <style>
+        body {
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: white;
+            font-size: 1.5em; /* Reduced font size */
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #autocue-text {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            white-space: pre-wrap; /* Preserves carriage returns */
+            font-size: 3em; /* Default font size for display */
+        }
+        #file-input-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+        }
+        #file-input-container input[type="file"],
+        #file-input-container input[type="text"],
+        #file-input-container input[type="number"],
+        #file-input-container select {
+            margin-top: 10px;
+            font-size: 1em; /* Adjusted for smaller screen fit */
+            color: white;
+            background-color: black;
+            border: 2px solid white;
+            padding: 5px;
+            cursor: pointer;
+        }
+        #file-input-container button {
+            margin-top: 15px;
+            font-size: 1em; /* Adjusted for smaller screen fit */
+            color: white;
+            background-color: black;
+            border: 2px solid white;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        #flip-text {
+            background-color: black;
+        }
+        #flip-text.pressed {
+            background-color: grey;
+        }
+        #readme-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            color: black;
+            padding: 20px;
+            border: 2px solid black;
+            font-family: Calibri, sans-serif;
+            max-width: 80%;
+            max-height: 80%;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #close-readme {
+            margin-top: 20px;
+            font-size: 1.2em;
+            cursor: pointer;
+            background-color: grey;
+            padding: 5px 10px;
+            border: none;
+            color: white;
+        }
+        .monospace {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="file-input-container">
+        <button id="readme-button">Read Me First</button>
+        <div>Select your autocue.txt file</div>
+        <input type="file" id="file-input" accept=".txt">
+        
+        <div>
+            <label for="display-time">Display time (seconds):</label>
+            <input type="text" id="display-time" value="3">
+        </div>
+        
+        <div>
+            <label for="gap-time">Gap time (seconds):</label>
+            <input type="text" id="gap-time" value="0.9">
+        </div>
+
+        <div>
+            <label for="font-size">Font size for display:</label>
+            <select id="font-size">
+                <option value="2">2em</option>
+                <option value="2.5">2.5em</option>
+                <option value="3" selected>3em</option>
+                <option value="3.5">3.5em</option>
+                <option value="4">4em</option>
+	            <option value="5">5em</option>
+				<option value="6">6em</option>
+				<option value="7">7em</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="shuffle-after">Randomly shuffle after line:</label>
+            <input type="number" id="shuffle-after" min="1" placeholder="Enter a line number">
+        </div>
+
+        <button id="flip-text">Flip Text Vertically</button>
+        <button id="start-autocue">Start Autocue</button>
+
+    </div>
+
+    <div id="autocue-text" style="display:none;"></div>
+
+    <div id="readme-modal">
+        <div>
+            <p>Kia ora e hoa m&#257;,</p>
+            <p>Here's the autocue I made! You'll have to download these files to your computer first in order to run them.</p>
+            <p>Instructions:</p>
+            <p>Make a plain .txt file for your script and save it with UTF-8 BOM encoding. Treat each line of your script text file like something you want on one screen. If you're just presenting single words, then put each word on a new line. If it's a sentence, you can add some carriage returns by putting \r where you'd press "enter" for a new line. Also, if you want to make the rest of a sentence to appear in smaller, light grey text (e.g. the English translation), then put \grey before that bit.</p>
+            <p>So:</p>
+            <p class="monospace">Kei hea te\rr&#257;kau</p>
+            <p>will look like:</p>
+            <p style="text-align: center;">Kei hea te<br>r&#257;kau</p>
+            <p>and</p>
+            <p class="monospace">Kei hea te\rr&#257;kau\r\greystick</p>
+            <p>will look like:</p>
+            <p style="text-align: center;">Kei hea te<br>r&#257;kau<br><span style="color: #A5A5A5; font-size: 0.8em;">stick</span></p>
+            <p>Hope that makes sense!</p>
+			<p>Oh, and you can shuffle the items after a specific line (to allow for an intro), or if you leave it blank it will just display them in the order that's in the file.</p>
+			<p>Enjoy!</p>
+            <p>Greg O'Beirne<br>
+            <small>University of Canterbury</small></p>
+        </div>
+        <button id="close-readme">Close</button>
+    </div>
+
+    <script>
+        let flipEnabled = false;
+
+        document.getElementById('start-autocue').addEventListener('click', function() {
+            const fileInput = document.getElementById('file-input');
+            const displayTime = parseFloat(document.getElementById('display-time').value) * 1000 || 3000;
+            const gapTime = parseFloat(document.getElementById('gap-time').value) * 1000 || 900;
+            const fontSize = document.getElementById('font-size').value + 'em';
+            const shuffleAfter = parseInt(document.getElementById('shuffle-after').value);
+
+            const textElement = document.getElementById('autocue-text');
+            textElement.style.fontSize = fontSize; // Set the selected font size for display
+
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const text = e.target.result;
+                    startAutocue(text, displayTime, gapTime, shuffleAfter);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('flip-text').addEventListener('click', function() {
+            flipEnabled = !flipEnabled;
+            this.classList.toggle('pressed', flipEnabled);
+        });
+
+        document.getElementById('readme-button').addEventListener('click', function() {
+            document.getElementById('readme-modal').style.display = 'block';
+        });
+
+        document.getElementById('close-readme').addEventListener('click', function() {
+            document.getElementById('readme-modal').style.display = 'none';
+        });
+
+        function processLine(line) {
+            line = line.replace(/\\r/g, '\r\n'); // Handle \r as carriage return
+            if (line.includes('\\grey')) {
+                line = line.replace(/\\grey/g, '<span style="color: grey; font-size: 0.6em;">') + '</span>';
+            }
+            return line;
+        }
+
+        function displayText(lines, displayTime, gapTime) {
+            let index = 0;
+            const textElement = document.getElementById('autocue-text');
+            document.getElementById('file-input-container').style.display = 'none'; // Hide file input container
+            textElement.style.display = 'block'; // Show autocue text container
+
+            function showNextLine() {
+                if (index < lines.length) {
+                    textElement.style.opacity = 0;  // Fade out text
+                    setTimeout(() => {
+                        let currentLine = processLine(lines[index]);
+                        textElement.style.transform = flipEnabled ? 'rotate(180deg) scaleX(-1)' : 'rotate(0deg) scaleX(1)';
+                        textElement.innerHTML = currentLine;
+                        textElement.style.opacity = 1;  // Fade in text
+                        index++;
+                    }, gapTime);  // Gap time before showing the next line
+
+                    setTimeout(showNextLine, displayTime + gapTime);  // Display time + gap time
+                }
+            }
+
+            showNextLine();
+        }
+
+        function startAutocue(text, displayTime, gapTime, shuffleAfter) {
+            let lines = text.split('\n').map(line => line.trim()).filter(line => line);
+            if (shuffleAfter && shuffleAfter > 0 && shuffleAfter < lines.length) {
+                const beforeShuffle = lines.slice(0, shuffleAfter);
+                const toShuffle = lines.slice(shuffleAfter);
+                lines = beforeShuffle.concat(shuffleArray(toShuffle));
+            }
+
+            if (lines.length > 0) {
+                displayText(lines, displayTime, gapTime);
+            } else {
+                document.getElementById('autocue-text').textContent = 'No text to display.';
+            }
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+    </script>
+</body>
+</html>
