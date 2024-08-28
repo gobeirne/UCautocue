@@ -1,0 +1,3 @@
+﻿This is the first screen
+This is the first line of the second screen\rand the second line of the second screen
+This is the third screen\r\greyand this a subtitle
